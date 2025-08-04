@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>어린이집 선생님 일정 공유 달력</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        .calendar-day:hover { transform: translateY(-2px); transition: all 0.2s ease; }
+        .event-dot { width: 6px; height: 6px; border-radius: 50%; margin: 1px; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- 헤더 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">🏫 어린이집 일정 달력</h1>
+                    <p class="text-gray-600">선생님들의 일정을 함께 공유해요</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="prevMonth()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        ← 이전달
+                    </button>
+                    <span id="currentMonth" class="text-xl font-semibold text-gray-800 min-w-32 text-center"></span>
+                    <button onclick="nextMonth()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        다음달 →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 일정 검색 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🔍 일정 검색</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="text" id="searchInput" placeholder="일정 제목이나 선생님 이름으로 검색" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select id="filterTeacher" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">모든 선생님</option>
+                    <option value="김선생님">김선생님</option>
+                    <option value="이선생님">이선생님</option>
+                    <option value="박선생님">박선생님</option>
+                    <option value="최선생님">최선생님</option>
+                    <option value="전체">전체</option>
+                </select>
+                <button onclick="clearSearch()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                    검색 초기화
+                </button>
+            </div>
+        </div>
+
+        <!-- 달력 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <!-- 요일 헤더 -->
+            <div class="grid grid-cols-7 gap-2 mb-4">
+                <div class="text-center font-semibold text-red-600 py-3">일</div>
+                <div class="text-center font-semibold text-gray-700 py-3">월</div>
+                <div class="text-center font-semibold text-gray-700 py-3">화</div>
+                <div class="text-center font-semibold text-gray-700 py-3">수</div>
+                <div class="text-center font-semibold text-gray-700 py-3">목</div>
+                <div class="text-center font-semibold text-gray-700 py-3">금</div>
+                <div class="text-center font-semibold text-blue-600 py-3">토</div>
+            </div>
+            
+            <!-- 달력 날짜 -->
+            <div id="calendarGrid" class="grid grid-cols-7 gap-2">
+                <!-- 달력 날짜들이 여기에 동적으로 생성됩니다 -->
+            </div>
+        </div>
+
+        <!-- 일정 목록 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mt-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">📋 이번 달 일정 목록</h2>
+            <div id="eventList" class="space-y-3">
+                <!-- 일정 목록이 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 일정 상세 모달 -->
+    <div id="eventModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">일정 상세</h3>
+            <div id="modalContent" class="space-y-3">
+                <!-- 모달 내용이 여기에 표시됩니다 -->
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새 일정 추가 모달 -->
+    <div id="addEventModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">📝 새 일정 추가</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">날짜</label>
+                    <input type="date" id="modalEventDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">일정 제목</label>
+                    <input type="text" id="modalEventTitle" placeholder="일정 제목을 입력하세요" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">담당 선생님</label>
+                    <select id="modalEventTeacher" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">선생님을 선택하세요</option>
+                        <option value="김선생님">김선생님</option>
+                        <option value="이선생님">이선생님</option>
+                        <option value="박선생님">박선생님</option>
+                        <option value="최선생님">최선생님</option>
+                        <option value="전체">전체</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">메모 (선택사항)</label>
+                    <textarea id="modalEventMemo" placeholder="추가 메모를 입력하세요" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeAddEventModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    취소
+                </button>
+                <button onclick="saveEventFromModal()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    저장
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let events = [
+            {
+                date: '2024-01-15',
+                title: '새학기 준비 회의',
+                teacher: '전체',
+                color: 'bg-blue-500'
+            },
+            {
+                date: '2024-01-20',
+                title: '부모 상담',
+                teacher: '김선생님',
+                color: 'bg-green-500'
+            },
+            {
+                date: '2024-01-25',
+                title: '생일파티',
+                teacher: '이선생님',
+                color: 'bg-pink-500'
+            }
+        ];
+
+        const teacherColors = {
+            '김선생님': 'bg-green-500',
+            '이선생님': 'bg-pink-500',
+            '박선생님': 'bg-purple-500',
+            '최선생님': 'bg-yellow-500',
+            '전체': 'bg-blue-500'
+        };
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            // 월 표시 업데이트
+            document.getElementById('currentMonth').textContent = `${year}년 ${month + 1}월`;
+            
+            // 달력 그리드 초기화
+            const calendarGrid = document.getElementById('calendarGrid');
+            calendarGrid.innerHTML = '';
+            
+            // 첫 번째 날과 마지막 날 계산
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            // 6주 표시
+            for (let week = 0; week < 6; week++) {
+                for (let day = 0; day < 7; day++) {
+                    const currentDay = new Date(startDate);
+                    currentDay.setDate(startDate.getDate() + (week * 7) + day);
+                    
+                    const dayElement = document.createElement('div');
+                    dayElement.className = `calendar-day min-h-32 p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 ${
+                        currentDay.getMonth() !== month ? 'text-gray-400 bg-gray-50' : 'bg-white'
+                    }`;
+                    
+                    const dateStr = currentDay.toISOString().split('T')[0];
+                    const dayEvents = events.filter(event => event.date === dateStr);
+                    
+                    dayElement.innerHTML = `
+                        <div class="font-medium ${day === 0 ? 'text-red-600' : day === 6 ? 'text-blue-600' : 'text-gray-800'} mb-1">${currentDay.getDate()}</div>
+                        <div class="space-y-1">
+                            ${dayEvents.slice(0, 3).map(event => `
+                                <div class="text-xs px-1 py-0.5 ${event.color} text-white rounded truncate" title="${event.title} - ${event.teacher}">
+                                    ${event.title}
+                                </div>
+                            `).join('')}
+                            ${dayEvents.length > 3 ? `<div class="text-xs text-gray-500">+${dayEvents.length - 3}개 더</div>` : ''}
+                        </div>
+                    `;
+                    
+                    let clickCount = 0;
+                    dayElement.onclick = () => {
+                        clickCount++;
+                        if (clickCount === 1) {
+                            setTimeout(() => {
+                                if (clickCount === 1) {
+                                    showDayEvents(dateStr, dayEvents);
+                                }
+                                clickCount = 0;
+                            }, 300);
+                        } else if (clickCount === 2) {
+                            openAddEventModal(dateStr);
+                            clickCount = 0;
+                        }
+                    };
+                    calendarGrid.appendChild(dayElement);
+                }
+            }
+            
+            renderEventList();
+        }
+
+        function showDayEvents(date, dayEvents) {
+            if (dayEvents.length === 0) return;
+            
+            const modal = document.getElementById('eventModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            modalContent.innerHTML = `
+                <h4 class="font-semibold text-gray-700 mb-3">${formattedDate}</h4>
+                ${dayEvents.map(event => `
+                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-4 h-4 ${event.color} rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-800">${event.title}</div>
+                            <div class="text-sm text-gray-600">${event.teacher}</div>
+                            ${event.memo ? `<div class="text-sm text-gray-500 mt-1">${event.memo}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('eventModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function openAddEventModal(date) {
+            const modal = document.getElementById('addEventModal');
+            document.getElementById('modalEventDate').value = date;
+            document.getElementById('modalEventTitle').value = '';
+            document.getElementById('modalEventTeacher').value = '';
+            document.getElementById('modalEventMemo').value = '';
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // 제목 입력 필드에 포커스
+            setTimeout(() => {
+                document.getElementById('modalEventTitle').focus();
+            }, 100);
+        }
+
+        function closeAddEventModal() {
+            const modal = document.getElementById('addEventModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveEventFromModal() {
+            const date = document.getElementById('modalEventDate').value;
+            const title = document.getElementById('modalEventTitle').value;
+            const teacher = document.getElementById('modalEventTeacher').value;
+            const memo = document.getElementById('modalEventMemo').value;
+            
+            if (!title || !teacher) {
+                alert('일정 제목과 담당 선생님을 입력해주세요!');
+                return;
+            }
+            
+            const newEvent = {
+                date: date,
+                title: title,
+                teacher: teacher,
+                memo: memo,
+                color: teacherColors[teacher] || 'bg-gray-500'
+            };
+            
+            events.push(newEvent);
+            closeAddEventModal();
+            renderCalendar();
+            alert('일정이 추가되었습니다!');
+        }
+
+        function searchEvents() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filterTeacher = document.getElementById('filterTeacher').value;
+            
+            const filteredEvents = events.filter(event => {
+                const matchesSearch = searchTerm === '' || 
+                    event.title.toLowerCase().includes(searchTerm) || 
+                    event.teacher.toLowerCase().includes(searchTerm) ||
+                    (event.memo && event.memo.toLowerCase().includes(searchTerm));
+                
+                const matchesTeacher = filterTeacher === '' || event.teacher === filterTeacher;
+                
+                return matchesSearch && matchesTeacher;
+            });
+            
+            displaySearchResults(filteredEvents);
+        }
+
+        function displaySearchResults(filteredEvents) {
+            const eventList = document.getElementById('eventList');
+            
+            if (filteredEvents.length === 0) {
+                eventList.innerHTML = '<p class="text-gray-500 text-center py-4">검색 결과가 없습니다.</p>';
+                return;
+            }
+            
+            const sortedEvents = filteredEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            eventList.innerHTML = sortedEvents.map(event => {
+                const eventDate = new Date(event.date + 'T00:00:00');
+                const formattedDate = eventDate.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                
+                return `
+                    <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="w-4 h-4 ${event.color} rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-800">${event.title}</div>
+                            <div class="text-sm text-gray-600">${formattedDate} • ${event.teacher}</div>
+                            ${event.memo ? `<div class="text-sm text-gray-500 mt-1">${event.memo}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterTeacher').value = '';
+            renderEventList();
+        }
+
+        function renderEventList() {
+            const eventList = document.getElementById('eventList');
+            const currentMonth = currentDate.getMonth();
+            const currentYear = currentDate.getFullYear();
+            
+            const monthEvents = events.filter(event => {
+                const eventDate = new Date(event.date + 'T00:00:00');
+                return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+            }).sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (monthEvents.length === 0) {
+                eventList.innerHTML = '<p class="text-gray-500 text-center py-4">이번 달에 등록된 일정이 없습니다.</p>';
+                return;
+            }
+            
+            eventList.innerHTML = monthEvents.map(event => {
+                const eventDate = new Date(event.date + 'T00:00:00');
+                const formattedDate = eventDate.toLocaleDateString('ko-KR', {
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                
+                return `
+                    <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="w-4 h-4 ${event.color} rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-800">${event.title}</div>
+                            <div class="text-sm text-gray-600">${formattedDate} • ${event.teacher}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function prevMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        // 초기 렌더링
+        renderCalendar();
+
+        // 검색 이벤트 리스너 추가
+        document.getElementById('searchInput').addEventListener('input', searchEvents);
+        document.getElementById('filterTeacher').addEventListener('change', searchEvents);
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'969b4fe8d265ea97',t:'MTc1NDI4MTc1MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
